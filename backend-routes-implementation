@@ -1,0 +1,334 @@
+// File: /backend/src/routes/botRoutes.js
+const express = require('express');
+const { check } = require('express-validator');
+const botController = require('../controllers/botController');
+
+const router = express.Router();
+
+// GET /api/bots - Get all bots for current user
+router.get('/', botController.getAllBots);
+
+// POST /api/bots - Create a new bot
+router.post('/', [
+  check('name', 'Bot name is required').not().isEmpty(),
+  check('description', 'Description must be a string').optional().isString()
+], botController.createBot);
+
+// GET /api/bots/:id - Get a specific bot
+router.get('/:id', botController.getBotById);
+
+// PUT /api/bots/:id - Update a bot
+router.put('/:id', botController.updateBot);
+
+// DELETE /api/bots/:id - Delete a bot
+router.delete('/:id', botController.deleteBot);
+
+// PATCH /api/bots/:id/status - Update bot status
+router.patch('/:id/status', botController.updateBotStatus);
+
+module.exports = router;
+
+// File: /backend/src/routes/chatRoutes.js
+const express = require('express');
+const aiService = require('../services/aiService');
+const Conversation = require('../models/Conversation');
+const router = express.Router();
+
+// POST /api/chat/:botId - Send a message to a bot
+router.post('/:botId', async (req, res, next) => {
+  try {
+    const { botId } = req.params;
+    const { message, conversationId } = req.body;
+    
+    if (!message) {
+      return res.status(400).json({ message: 'Message is required' });
+    }
+    
+    const response = await aiService.generateBotResponse(botId, message, conversationId);
+    
+    res.status(200).json(response);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/chat/:botId/conversations/:conversationId - Get conversation history
+router.get('/:botId/conversations/:conversationId', async (req, res, next) => {
+  try {
+    const { botId, conversationId } = req.params;
+    
+    const conversation = await Conversation.findOne({
+      _id: conversationId,
+      botId
+    });
+    
+    if (!conversation) {
+      return res.status(404).json({ message: 'Conversation not found' });
+    }
+    
+    res.status(200).json(conversation);
+  } catch (error) {
+    next(error);
+  }
+});
+
+module.exports = router;
+
+// File: /backend/src/routes/conversationRoutes.js
+const express = require('express');
+const conversationController = require('../controllers/conversationController');
+const router = express.Router();
+
+// GET /api/conversations - Get all conversations for current user's bots
+router.get('/', conversationController.getAllConversations);
+
+// GET /api/conversations/:id - Get a specific conversation
+router.get('/:id', conversationController.getConversationById);
+
+// DELETE /api/conversations/:id - Delete a conversation
+router.delete('/:id', conversationController.deleteConversation);
+
+module.exports = router;
+
+// File: /backend/src/routes/analyticsRoutes.js
+const express = require('express');
+const analyticsController = require('../controllers/analyticsController');
+const router = express.Router();
+
+// GET /api/analytics/bots/:botId - Get analytics for a specific bot
+router.get('/bots/:botId', analyticsController.getBotAnalytics);
+
+// GET /api/analytics/bots/:botId/conversations - Get conversation analytics
+router.get('/bots/:botId/conversations', analyticsController.getConversationAnalytics);
+
+// GET /api/analytics/bots/:botId/objectives - Get objective completion analytics
+router.get('/bots/:botId/objectives', analyticsController.getObjectiveAnalytics);
+
+// GET /api/analytics/overview - Get aggregated analytics for all bots
+router.get('/overview', analyticsController.getOverviewAnalytics);
+
+module.exports = router;
+
+// File: /backend/src/controllers/analyticsController.js
+const Bot = require('../models/Bot');
+const Conversation = require('../models/Conversation');
+const ObjectiveCompletion = require('../models/ObjectiveCompletion');
+
+exports.getBotAnalytics = async (req, res, next) => {
+  try {
+    const { botId } = req.params;
+    
+    // Verify bot belongs to current user
+    const bot = await Bot.findOne({ _id: botId, userId: req.user.id });
+    if (!bot) {
+      return res.status(404).json({ message: 'Bot not found' });
+    }
+    
+    // Get conversation count over time
+    const conversationsByDate = await Conversation.aggregate([
+      { $match: { botId: bot._id } },
+      { $group: {
+          _id: { 
+            $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } 
+          },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+    
+    // Get average conversation length
+    const conversationLengths = await Conversation.aggregate([
+      { $match: { botId: bot._id } },
+      { $project: {
+          messageCount: { $size: "$messages" }
+        }
+      },
+      { $group: {
+          _id: null,
+          avgLength: { $avg: "$messageCount" },
+          maxLength: { $max: "$messageCount" }
+        }
+      }
+    ]);
+    
+    // Return compiled analytics
+    res.status(200).json({
+      botId: bot._id,
+      stats: bot.stats,
+      conversationsByDate,
+      conversationLengths: conversationLengths[0] || { avgLength: 0, maxLength: 0 }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.getConversationAnalytics = async (req, res, next) => {
+  try {
+    const { botId } = req.params;
+    const { startDate, endDate } = req.query;
+    
+    // Verify bot belongs to current user
+    const bot = await Bot.findOne({ _id: botId, userId: req.user.id });
+    if (!bot) {
+      return res.status(404).json({ message: 'Bot not found' });
+    }
+    
+    // Build query
+    const query = { botId: bot._id };
+    
+    // Add date range if provided
+    if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) query.createdAt.$gte = new Date(startDate);
+      if (endDate) query.createdAt.$lte = new Date(endDate);
+    }
+    
+    // Get hourly distribution
+    const hourlyDistribution = await Conversation.aggregate([
+      { $match: query },
+      { $group: {
+          _id: { $hour: "$createdAt" },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+    
+    // Get daily distribution
+    const dailyDistribution = await Conversation.aggregate([
+      { $match: query },
+      { $group: {
+          _id: { $dayOfWeek: "$createdAt" },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+    
+    // Return compiled analytics
+    res.status(200).json({
+      botId: bot._id,
+      hourlyDistribution,
+      dailyDistribution
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.getObjectiveAnalytics = async (req, res, next) => {
+  try {
+    const { botId } = req.params;
+    
+    // Verify bot belongs to current user
+    const bot = await Bot.findOne({ _id: botId, userId: req.user.id });
+    if (!bot) {
+      return res.status(404).json({ message: 'Bot not found' });
+    }
+    
+    // Get objective completion stats
+    const objectiveStats = await ObjectiveCompletion.aggregate([
+      { $match: { botId: bot._id } },
+      { $group: {
+          _id: "$objectiveId",
+          completionCount: { $sum: 1 },
+          avgCompletionTime: { $avg: "$completionTime" }
+        }
+      }
+    ]);
+    
+    // Map objective IDs to names
+    const objectiveStatsWithNames = objectiveStats.map(stat => {
+      const objective = bot.objectives.find(obj => obj._id.toString() === stat._id);
+      return {
+        ...stat,
+        name: objective ? objective.name : 'Unknown Objective'
+      };
+    });
+    
+    // Return compiled analytics
+    res.status(200).json({
+      botId: bot._id,
+      objectiveStats: objectiveStatsWithNames
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.getOverviewAnalytics = async (req, res, next) => {
+  try {
+    // Get all bots for the current user
+    const bots = await Bot.find({ userId: req.user.id });
+    
+    const botIds = bots.map(bot => bot._id);
+    
+    // Get total stats
+    const totalStats = await Bot.aggregate([
+      { $match: { _id: { $in: botIds } } },
+      { $group: {
+          _id: null,
+          totalConversations: { $sum: "$stats.conversationCount" },
+          totalMessages: { $sum: "$stats.messageCount" },
+          totalAppointments: { $sum: "$stats.appointmentsBooked" },
+          totalLeads: { $sum: "$stats.leadsGenerated" }
+        }
+      }
+    ]);
+    
+    // Get conversation trend over last 30 days
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const conversationTrend = await Conversation.aggregate([
+      { $match: { 
+          botId: { $in: botIds },
+          createdAt: { $gte: thirtyDaysAgo }
+        }
+      },
+      { $group: {
+          _id: { 
+            $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } 
+          },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+    
+    // Get bot performance comparison
+    const botPerformance = await Conversation.aggregate([
+      { $match: { botId: { $in: botIds } } },
+      { $group: {
+          _id: "$botId",
+          conversationCount: { $sum: 1 }
+        }
+      }
+    ]);
+    
+    // Map bot IDs to names
+    const botPerformanceWithNames = botPerformance.map(perf => {
+      const bot = bots.find(b => b._id.toString() === perf._id.toString());
+      return {
+        ...perf,
+        name: bot ? bot.name : 'Unknown Bot'
+      };
+    });
+    
+    // Return compiled analytics
+    res.status(200).json({
+      totalStats: totalStats[0] || {
+        totalConversations: 0,
+        totalMessages: 0,
+        totalAppointments: 0,
+        totalLeads: 0
+      },
+      conversationTrend,
+      botPerformance: botPerformanceWithNames
+    });
+  } catch (error) {
+    next(error);
+  }
+};
