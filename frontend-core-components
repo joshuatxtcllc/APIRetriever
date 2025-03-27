@@ -1,0 +1,631 @@
+// File: /frontend/src/components/layout/Layout.jsx
+import React from 'react';
+import Header from './Header';
+import Sidebar from './Sidebar';
+import MainContent from './MainContent';
+
+const Layout = ({ children }) => {
+  return (
+    <div className="layout-container">
+      <Header />
+      <div className="layout-body">
+        <Sidebar />
+        <MainContent>{children}</MainContent>
+      </div>
+    </div>
+  );
+};
+
+export default Layout;
+
+// File: /frontend/src/components/layout/Sidebar.jsx
+import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { Home, MessageSquare, BarChart2, Settings, Link as LinkIcon } from 'lucide-react';
+
+const Sidebar = () => {
+  const location = useLocation();
+  
+  const isActive = (path) => {
+    return location.pathname === path;
+  };
+  
+  return (
+    <div className="sidebar">
+      <div className="sidebar-logo">
+        <img src="/assets/images/logo.svg" alt="Bot Builder Logo" />
+        <h3>Bot Builder</h3>
+      </div>
+      
+      <nav className="sidebar-nav">
+        <Link to="/" className={`sidebar-link ${isActive('/') ? 'active' : ''}`}>
+          <Home size={18} />
+          <span>Dashboard</span>
+        </Link>
+        
+        <Link to="/bot-builder" className={`sidebar-link ${isActive('/bot-builder') ? 'active' : ''}`}>
+          <MessageSquare size={18} />
+          <span>Bot Builder</span>
+        </Link>
+        
+        <Link to="/analytics" className={`sidebar-link ${isActive('/analytics') ? 'active' : ''}`}>
+          <BarChart2 size={18} />
+          <span>Analytics</span>
+        </Link>
+        
+        <Link to="/integrations" className={`sidebar-link ${isActive('/integrations') ? 'active' : ''}`}>
+          <LinkIcon size={18} />
+          <span>Integrations</span>
+        </Link>
+        
+        <Link to="/settings" className={`sidebar-link ${isActive('/settings') ? 'active' : ''}`}>
+          <Settings size={18} />
+          <span>Settings</span>
+        </Link>
+      </nav>
+    </div>
+  );
+};
+
+export default Sidebar;
+
+// File: /frontend/src/components/builder/BotList.jsx
+import React, { useState, useEffect } from 'react';
+import BotCard from './BotCard';
+import NewBotButton from './NewBotButton';
+import { getBots } from '../../services/botService';
+import Loader from '../common/Loader';
+
+const BotList = () => {
+  const [bots, setBots] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  useEffect(() => {
+    const fetchBots = async () => {
+      try {
+        setLoading(true);
+        const botsData = await getBots();
+        setBots(botsData);
+        setLoading(false);
+      } catch (err) {
+        setError('Failed to load bots. Please try again.');
+        setLoading(false);
+      }
+    };
+    
+    fetchBots();
+  }, []);
+  
+  if (loading) return <Loader />;
+  
+  if (error) {
+    return (
+      <div className="error-container">
+        <p>{error}</p>
+        <button onClick={() => window.location.reload()}>Retry</button>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="bot-list">
+      <h2>Your Bots</h2>
+      <div className="bot-grid">
+        {bots.map(bot => (
+          <BotCard key={bot.id} bot={bot} />
+        ))}
+        <NewBotButton />
+      </div>
+    </div>
+  );
+};
+
+export default BotList;
+
+// File: /frontend/src/components/builder/BotCard.jsx
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { MessageSquare, Calendar, Check, AlertCircle } from 'lucide-react';
+
+const BotCard = ({ bot }) => {
+  // Function to determine status color
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'active':
+        return 'status-green';
+      case 'draft':
+        return 'status-yellow';
+      case 'inactive':
+        return 'status-red';
+      default:
+        return 'status-gray';
+    }
+  };
+  
+  // Function to get status icon
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'active':
+        return <Check size={14} />;
+      case 'draft':
+        return <AlertCircle size={14} />;
+      case 'inactive':
+        return <AlertCircle size={14} />;
+      default:
+        return null;
+    }
+  };
+  
+  return (
+    <Link to={`/bot-builder/${bot.id}`} className="bot-card">
+      <div className={`bot-card-status ${getStatusColor(bot.status)}`}>
+        {getStatusIcon(bot.status)}
+        <span>{bot.status}</span>
+      </div>
+      
+      <h3 className="bot-card-title">{bot.name}</h3>
+      <p className="bot-card-description">{bot.description}</p>
+      
+      <div className="bot-card-stats">
+        <div className="stat">
+          <MessageSquare size={16} />
+          <span>{bot.messageCount || 0} messages</span>
+        </div>
+        
+        <div className="stat">
+          <Calendar size={16} />
+          <span>{bot.appointmentsBooked || 0} appointments</span>
+        </div>
+      </div>
+      
+      <div className="bot-card-footer">
+        <span>Last updated: {new Date(bot.updatedAt).toLocaleDateString()}</span>
+      </div>
+    </Link>
+  );
+};
+
+export default BotCard;
+
+// File: /frontend/src/components/builder/GeneralSettings.jsx
+import React from 'react';
+import FormField from '../common/FormField';
+import Select from '../common/Select';
+import Switch from '../common/Switch';
+
+const GeneralSettings = ({ botConfig, updateBotConfig }) => {
+  const handleInputChange = (field, value) => {
+    updateBotConfig({
+      ...botConfig,
+      [field]: value
+    });
+  };
+
+  const handleAISettingsChange = (field, value) => {
+    updateBotConfig({
+      ...botConfig,
+      aiSettings: {
+        ...botConfig.aiSettings,
+        [field]: value
+      }
+    });
+  };
+
+  return (
+    <div className="general-settings">
+      <h2>General Settings</h2>
+      
+      <div className="settings-section">
+        <h3>Basic Information</h3>
+        
+        <FormField
+          label="Bot Name"
+          id="botName"
+          type="text"
+          value={botConfig.botName}
+          onChange={(e) => handleInputChange('botName', e.target.value)}
+          placeholder="Enter your bot's name"
+          required
+        />
+        
+        <FormField
+          label="Business Name"
+          id="businessName"
+          type="text"
+          value={botConfig.businessName}
+          onChange={(e) => handleInputChange('businessName', e.target.value)}
+          placeholder="Enter your business name"
+        />
+        
+        <FormField
+          label="Business Description"
+          id="businessDescription"
+          type="textarea"
+          value={botConfig.businessDescription}
+          onChange={(e) => handleInputChange('businessDescription', e.target.value)}
+          placeholder="Briefly describe your business"
+          rows={3}
+        />
+      </div>
+      
+      <div className="settings-section">
+        <h3>Chat Settings</h3>
+        
+        <FormField
+          label="Welcome Message"
+          id="welcomeMessage"
+          type="textarea"
+          value={botConfig.welcomeMessage}
+          onChange={(e) => handleInputChange('welcomeMessage', e.target.value)}
+          placeholder="Enter the message your bot will use to greet visitors"
+          rows={2}
+        />
+        
+        <div className="field-row">
+          <FormField
+            label="Chat Avatar"
+            id="avatarUrl"
+            type="file"
+            accept="image/*"
+            onChange={(file) => handleInputChange('avatarUrl', file)}
+          />
+          
+          {botConfig.avatarUrl && (
+            <div className="avatar-preview">
+              <img src={botConfig.avatarUrl} alt="Bot Avatar" />
+            </div>
+          )}
+        </div>
+      </div>
+      
+      <div className="settings-section">
+        <h3>AI Settings</h3>
+        
+        <Select
+          label="AI Model"
+          id="aiModel"
+          value={botConfig.aiSettings.model}
+          onChange={(value) => handleAISettingsChange('model', value)}
+          options={[
+            { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo (Faster, lower cost)' },
+            { value: 'gpt-4', label: 'GPT-4 (More capable, higher cost)' },
+            { value: 'claude-3-opus', label: 'Claude 3 Opus (Advanced understanding)' }
+          ]}
+        />
+        
+        <FormField
+          label="Temperature"
+          id="temperature"
+          type="range"
+          min="0"
+          max="1"
+          step="0.1"
+          value={botConfig.aiSettings.temperature}
+          onChange={(e) => handleAISettingsChange('temperature', parseFloat(e.target.value))}
+          description={`${botConfig.aiSettings.temperature} - Higher values make responses more creative, lower values make them more predictable`}
+        />
+        
+        <Switch
+          label="Enable Smart Responses"
+          id="enableSmartResponses"
+          checked={botConfig.aiSettings.enableSmartResponses}
+          onChange={(checked) => handleAISettingsChange('enableSmartResponses', checked)}
+          description="Allow the bot to adapt its responses based on the conversation context"
+        />
+      </div>
+    </div>
+  );
+};
+
+export default GeneralSettings;
+
+// File: /frontend/src/components/builder/ObjectivesEditor.jsx
+import React from 'react';
+import { DragDropContext, Droppable } from 'react-beautiful-dnd';
+import ObjectiveItem from './ObjectiveItem';
+import Button from '../common/Button';
+import { Plus } from 'lucide-react';
+
+const ObjectivesEditor = ({ objectives, updateObjectives }) => {
+  const addObjective = () => {
+    const newObjective = {
+      id: `objective-${Date.now()}`,
+      name: 'New Objective',
+      priority: objectives.length + 1,
+      questions: ['']
+    };
+    
+    updateObjectives([...objectives, newObjective]);
+  };
+  
+  const updateObjective = (id, updatedObjective) => {
+    const updatedObjectives = objectives.map(obj => 
+      obj.id === id ? updatedObjective : obj
+    );
+    updateObjectives(updatedObjectives);
+  };
+  
+  const deleteObjective = (id) => {
+    const filteredObjectives = objectives.filter(obj => obj.id !== id);
+    // Reorder priorities after deletion
+    const reorderedObjectives = filteredObjectives.map((obj, index) => ({
+      ...obj,
+      priority: index + 1
+    }));
+    updateObjectives(reorderedObjectives);
+  };
+  
+  const handleDragEnd = (result) => {
+    if (!result.destination) return;
+    
+    const items = Array.from(objectives);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
+    
+    // Update priorities based on new positions
+    const updatedItems = items.map((item, index) => ({
+      ...item,
+      priority: index + 1
+    }));
+    
+    updateObjectives(updatedItems);
+  };
+  
+  return (
+    <div className="objectives-editor">
+      <div className="objectives-header">
+        <h2>Conversation Objectives</h2>
+        <Button 
+          className="add-objective-btn"
+          onClick={addObjective}
+          icon={<Plus size={16} />}
+        >
+          Add Objective
+        </Button>
+      </div>
+      
+      <p className="objectives-description">
+        Define what your bot should accomplish during conversations. Drag to reorder priorities.
+      </p>
+      
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <Droppable droppableId="objectives">
+          {(provided) => (
+            <div
+              className="objectives-list"
+              {...provided.droppableProps}
+              ref={provided.innerRef}
+            >
+              {objectives.map((objective, index) => (
+                <ObjectiveItem
+                  key={objective.id}
+                  objective={objective}
+                  index={index}
+                  updateObjective={updateObjective}
+                  deleteObjective={deleteObjective}
+                />
+              ))}
+              {provided.placeholder}
+            </div>
+          )}
+        </Droppable>
+      </DragDropContext>
+    </div>
+  );
+};
+
+export default ObjectivesEditor;
+
+// File: /frontend/src/components/builder/KnowledgeBase.jsx
+import React, { useState } from 'react';
+import KnowledgeItem from './KnowledgeItem';
+import Button from '../common/Button';
+import { Plus, Upload, Download } from 'lucide-react';
+import Modal from '../common/Modal';
+import FormField from '../common/FormField';
+
+const KnowledgeBase = ({ knowledgeBase, updateKnowledgeBase }) => {
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importType, setImportType] = useState('url');
+  const [importValue, setImportValue] = useState('');
+  const [importFile, setImportFile] = useState(null);
+  const [importing, setImporting] = useState(false);
+  
+  const addKnowledgeItem = () => {
+    const newItem = {
+      id: `kb-${Date.now()}`,
+      question: '',
+      answer: ''
+    };
+    
+    updateKnowledgeBase([...knowledgeBase, newItem]);
+  };
+  
+  const updateKnowledgeItem = (id, updatedItem) => {
+    const updatedKB = knowledgeBase.map(item => 
+      item.id === id ? updatedItem : item
+    );
+    updateKnowledgeBase(updatedKB);
+  };
+  
+  const deleteKnowledgeItem = (id) => {
+    const filteredKB = knowledgeBase.filter(item => item.id !== id);
+    updateKnowledgeBase(filteredKB);
+  };
+  
+  const handleImport = async () => {
+    setImporting(true);
+    
+    try {
+      // Simulated import processing
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      if (importType === 'url') {
+        // Here you would fetch the content from the URL and process it
+        console.log('Importing from URL:', importValue);
+        
+        // For demonstration, adding a placeholder item
+        const newItem = {
+          id: `kb-${Date.now()}`,
+          question: 'Imported Question',
+          answer: `Content imported from ${importValue}`
+        };
+        
+        updateKnowledgeBase([...knowledgeBase, newItem]);
+      } else if (importType === 'file' && importFile) {
+        // Here you would process the file content
+        console.log('Importing from file:', importFile.name);
+        
+        // For demonstration, adding a placeholder item
+        const newItem = {
+          id: `kb-${Date.now()}`,
+          question: 'Imported Question',
+          answer: `Content imported from ${importFile.name}`
+        };
+        
+        updateKnowledgeBase([...knowledgeBase, newItem]);
+      }
+      
+      setShowImportModal(false);
+      setImportValue('');
+      setImportFile(null);
+    } catch (error) {
+      console.error('Import failed:', error);
+      // Handle error state
+    } finally {
+      setImporting(false);
+    }
+  };
+  
+  const exportKnowledgeBase = () => {
+    // Create a JSON file with the knowledge base data
+    const dataStr = JSON.stringify(knowledgeBase, null, 2);
+    const dataUri = `data:application/json;charset=utf-8,${encodeURIComponent(dataStr)}`;
+    
+    // Create a download link and trigger it
+    const exportFileDefaultName = `knowledge-base-${new Date().toISOString().split('T')[0]}.json`;
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+  };
+  
+  return (
+    <div className="knowledge-base">
+      <div className="knowledge-base-header">
+        <h2>Knowledge Base</h2>
+        <div className="knowledge-base-actions">
+          <Button 
+            className="import-btn"
+            onClick={() => setShowImportModal(true)}
+            icon={<Upload size={16} />}
+          >
+            Import
+          </Button>
+          
+          <Button 
+            className="export-btn"
+            onClick={exportKnowledgeBase}
+            icon={<Download size={16} />}
+          >
+            Export
+          </Button>
+          
+          <Button 
+            className="add-knowledge-btn"
+            onClick={addKnowledgeItem}
+            icon={<Plus size={16} />}
+          >
+            Add Item
+          </Button>
+        </div>
+      </div>
+      
+      <p className="knowledge-base-description">
+        Add questions and answers that your bot should know. This helps the bot respond to common questions accurately.
+      </p>
+      
+      <div className="knowledge-items-list">
+        {knowledgeBase.map(item => (
+          <KnowledgeItem
+            key={item.id}
+            item={item}
+            updateItem={updateKnowledgeItem}
+            deleteItem={deleteKnowledgeItem}
+          />
+        ))}
+        
+        {knowledgeBase.length === 0 && (
+          <div className="empty-knowledge-base">
+            <p>No knowledge base items yet. Add some to help your bot answer questions.</p>
+            <Button onClick={addKnowledgeItem} icon={<Plus size={16} />}>
+              Add Your First Item
+            </Button>
+          </div>
+        )}
+      </div>
+      
+      <Modal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        title="Import Knowledge Base Content"
+      >
+        <div className="import-options">
+          <div className="import-type-selector">
+            <button
+              className={`import-type-btn ${importType === 'url' ? 'active' : ''}`}
+              onClick={() => setImportType('url')}
+            >
+              Import from URL
+            </button>
+            <button
+              className={`import-type-btn ${importType === 'file' ? 'active' : ''}`}
+              onClick={() => setImportType('file')}
+            >
+              Import from File
+            </button>
+          </div>
+          
+          {importType === 'url' && (
+            <FormField
+              label="Website URL"
+              id="importUrl"
+              type="text"
+              value={importValue}
+              onChange={(e) => setImportValue(e.target.value)}
+              placeholder="https://example.com/faq"
+            />
+          )}
+          
+          {importType === 'file' && (
+            <FormField
+              label="Upload File"
+              id="importFile"
+              type="file"
+              accept=".txt,.csv,.json,.docx,.pdf"
+              onChange={(file) => setImportFile(file)}
+              description="Upload FAQ document, CSV, or exported knowledge base"
+            />
+          )}
+          
+          <div className="import-actions">
+            <Button onClick={() => setShowImportModal(false)}>
+              Cancel
+            </Button>
+            <Button 
+              primary 
+              onClick={handleImport} 
+              loading={importing}
+              disabled={importing || (importType === 'url' && !importValue) || (importType === 'file' && !importFile)}
+            >
+              {importing ? 'Importing...' : 'Import'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+};
+
+export default KnowledgeBase;
