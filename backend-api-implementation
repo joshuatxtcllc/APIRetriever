@@ -1,0 +1,494 @@
+// File: /backend/src/server.js
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const mongoose = require('mongoose');
+const dotenv = require('dotenv');
+
+// Import middleware
+const errorHandler = require('./middleware/errorHandler');
+const authMiddleware = require('./middleware/auth');
+
+// Import routes
+const authRoutes = require('./routes/authRoutes');
+const botRoutes = require('./routes/botRoutes');
+const userRoutes = require('./routes/userRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');
+const conversationRoutes = require('./routes/conversationRoutes');
+const integrationRoutes = require('./routes/integrationRoutes');
+
+// Load environment variables
+dotenv.config();
+
+// Initialize app
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+// Connect to MongoDB
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => console.error('MongoDB connection error:', err));
+
+// Middleware
+app.use(cors());
+app.use(helmet());
+app.use(morgan('dev'));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/users', authMiddleware, userRoutes);
+app.use('/api/bots', authMiddleware, botRoutes);
+app.use('/api/analytics', authMiddleware, analyticsRoutes);
+app.use('/api/conversations', authMiddleware, conversationRoutes);
+app.use('/api/integrations', authMiddleware, integrationRoutes);
+
+// Public bot chat endpoint (no auth required)
+app.use('/api/chat', require('./routes/chatRoutes'));
+
+// Error handling middleware
+app.use(errorHandler);
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+
+module.exports = app;
+
+// File: /backend/src/models/Bot.js
+const mongoose = require('mongoose');
+
+const botSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  name: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  description: {
+    type: String,
+    trim: true
+  },
+  status: {
+    type: String,
+    enum: ['active', 'draft', 'inactive'],
+    default: 'draft'
+  },
+  welcomeMessage: {
+    type: String,
+    default: 'Hi there! How can I help you today?'
+  },
+  avatarUrl: String,
+  businessInfo: {
+    name: String,
+    description: String,
+    website: String,
+    phone: String,
+    email: String,
+    address: String
+  },
+  objectives: [{
+    name: {
+      type: String,
+      required: true
+    },
+    priority: {
+      type: Number,
+      default: 1
+    },
+    questions: [String],
+    customFields: [{
+      fieldName: String,
+      fieldType: {
+        type: String,
+        enum: ['text', 'number', 'boolean', 'date'],
+        default: 'text'
+      },
+      required: {
+        type: Boolean,
+        default: false
+      }
+    }]
+  }],
+  knowledgeBase: [{
+    question: {
+      type: String,
+      required: true
+    },
+    answer: {
+      type: String,
+      required: true
+    }
+  }],
+  aiSettings: {
+    model: {
+      type: String,
+      enum: ['gpt-3.5-turbo', 'gpt-4', 'claude-3-opus'],
+      default: 'gpt-3.5-turbo'
+    },
+    temperature: {
+      type: Number,
+      min: 0,
+      max: 1,
+      default: 0.7
+    },
+    enableSmartResponses: {
+      type: Boolean,
+      default: true
+    }
+  },
+  design: {
+    primaryColor: {
+      type: String,
+      default: '#1976D2'
+    },
+    secondaryColor: {
+      type: String,
+      default: '#FFFFFF'
+    },
+    fontFamily: {
+      type: String,
+      default: 'Inter, sans-serif'
+    },
+    borderRadius: {
+      type: Number,
+      default: 8
+    },
+    position: {
+      type: String,
+      enum: ['bottom-right', 'bottom-left', 'top-right', 'top-left'],
+      default: 'bottom-right'
+    }
+  },
+  integrations: {
+    calendar: {
+      type: {
+        type: String,
+        enum: ['google', 'outlook', 'calendly', 'none'],
+        default: 'none'
+      },
+      apiKey: String,
+      calendarId: String,
+      configured: {
+        type: Boolean,
+        default: false
+      }
+    },
+    crm: {
+      type: {
+        type: String,
+        enum: ['salesforce', 'hubspot', 'zoho', 'none'],
+        default: 'none'
+      },
+      apiKey: String,
+      configured: {
+        type: Boolean,
+        default: false
+      }
+    }
+  },
+  stats: {
+    conversationCount: {
+      type: Number,
+      default: 0
+    },
+    messageCount: {
+      type: Number,
+      default: 0
+    },
+    appointmentsBooked: {
+      type: Number,
+      default: 0
+    },
+    leadsGenerated: {
+      type: Number,
+      default: 0
+    }
+  }
+}, { timestamps: true });
+
+const Bot = mongoose.model('Bot', botSchema);
+
+module.exports = Bot;
+
+// File: /backend/src/controllers/botController.js
+const Bot = require('../models/Bot');
+const { validationResult } = require('express-validator');
+
+exports.getAllBots = async (req, res, next) => {
+  try {
+    const bots = await Bot.find({ userId: req.user.id });
+    res.status(200).json(bots);
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.createBot = async (req, res, next) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { name, description } = req.body;
+    
+    const newBot = new Bot({
+      userId: req.user.id,
+      name,
+      description,
+      // Default values for other fields are defined in the schema
+    });
+    
+    await newBot.save();
+    
+    res.status(201).json(newBot);
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.getBotById = async (req, res, next) => {
+  try {
+    const bot = await Bot.findOne({ 
+      _id: req.params.id,
+      userId: req.user.id 
+    });
+    
+    if (!bot) {
+      return res.status(404).json({ message: 'Bot not found' });
+    }
+    
+    res.status(200).json(bot);
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.updateBot = async (req, res, next) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+    
+    const updatedBot = await Bot.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user.id },
+      { $set: req.body },
+      { new: true, runValidators: true }
+    );
+    
+    if (!updatedBot) {
+      return res.status(404).json({ message: 'Bot not found' });
+    }
+    
+    res.status(200).json(updatedBot);
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.deleteBot = async (req, res, next) => {
+  try {
+    const bot = await Bot.findOneAndDelete({
+      _id: req.params.id,
+      userId: req.user.id
+    });
+    
+    if (!bot) {
+      return res.status(404).json({ message: 'Bot not found' });
+    }
+    
+    res.status(200).json({ message: 'Bot deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.updateBotStatus = async (req, res, next) => {
+  try {
+    const { status } = req.body;
+    
+    if (!['active', 'draft', 'inactive'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status value' });
+    }
+    
+    const bot = await Bot.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user.id },
+      { $set: { status } },
+      { new: true }
+    );
+    
+    if (!bot) {
+      return res.status(404).json({ message: 'Bot not found' });
+    }
+    
+    res.status(200).json(bot);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// File: /backend/src/services/aiService.js
+const { OpenAI } = require('openai');
+const { Anthropic } = require('@anthropic-ai/sdk');
+const Bot = require('../models/Bot');
+const Conversation = require('../models/Conversation');
+
+// Initialize AI services
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
+
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY
+});
+
+// Helper function to get the right AI client based on the model
+const getAIClient = (model) => {
+  if (model.startsWith('gpt')) {
+    return 'openai';
+  } else if (model.startsWith('claude')) {
+    return 'anthropic';
+  } else {
+    // Default to OpenAI if model is not specified
+    return 'openai';
+  }
+};
+
+exports.generateBotResponse = async (botId, userMessage, conversationId) => {
+  try {
+    // Get bot configuration
+    const bot = await Bot.findById(botId);
+    if (!bot) {
+      throw new Error('Bot not found');
+    }
+    
+    // Get conversation history
+    let conversation;
+    if (conversationId) {
+      conversation = await Conversation.findById(conversationId);
+      if (!conversation) {
+        throw new Error('Conversation not found');
+      }
+    } else {
+      // Create new conversation if not provided
+      conversation = new Conversation({
+        botId,
+        messages: []
+      });
+      await conversation.save();
+    }
+    
+    // Prepare conversation context for AI
+    const conversationHistory = conversation.messages.map(msg => ({
+      role: msg.sender === 'user' ? 'user' : 'assistant',
+      content: msg.content
+    }));
+    
+    // Add current message to history
+    conversationHistory.push({
+      role: 'user',
+      content: userMessage
+    });
+    
+    // Prepare knowledge base as context
+    const knowledgeBaseContent = bot.knowledgeBase.map(item => 
+      `Q: ${item.question}\nA: ${item.answer}`
+    ).join('\n\n');
+    
+    // Prepare objectives as instructions
+    const objectivesContent = bot.objectives
+      .sort((a, b) => a.priority - b.priority)
+      .map(obj => `Objective ${obj.priority}: ${obj.name}`)
+      .join('\n');
+    
+    // Build system prompt
+    const systemPrompt = `
+      You are a helpful AI assistant named ${bot.name} working for ${bot.businessInfo.name}.
+      ${bot.businessInfo.description ? `About the business: ${bot.businessInfo.description}` : ''}
+      
+      Your objectives, in order of priority, are:
+      ${objectivesContent}
+      
+      Here is some knowledge base information to help you answer questions:
+      ${knowledgeBaseContent}
+      
+      Instructions:
+      1. Answer questions based on the provided knowledge base.
+      2. If you don't know an answer, politely say so rather than making up information.
+      3. Collect information relevant to the objectives when appropriate.
+      4. If users want to book an appointment, guide them through the process.
+      5. Be conversational, friendly, and helpful.
+      
+      Temperature setting: ${bot.aiSettings.temperature} (higher means more creative responses)
+    `;
+    
+    // Generate response based on the AI model
+    let aiResponse;
+    const aiClient = getAIClient(bot.aiSettings.model);
+    
+    if (aiClient === 'openai') {
+      const response = await openai.chat.completions.create({
+        model: bot.aiSettings.model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...conversationHistory
+        ],
+        temperature: bot.aiSettings.temperature
+      });
+      
+      aiResponse = response.choices[0].message.content;
+    } else if (aiClient === 'anthropic') {
+      const response = await anthropic.messages.create({
+        model: bot.aiSettings.model,
+        system: systemPrompt,
+        messages: conversationHistory.map(msg => ({
+          role: msg.role,
+          content: msg.content
+        })),
+        temperature: bot.aiSettings.temperature
+      });
+      
+      aiResponse = response.content[0].text;
+    }
+    
+    // Save message to conversation history
+    conversation.messages.push({
+      sender: 'user',
+      content: userMessage,
+      timestamp: new Date()
+    });
+    
+    conversation.messages.push({
+      sender: 'bot',
+      content: aiResponse,
+      timestamp: new Date()
+    });
+    
+    await conversation.save();
+    
+    // Update bot stats
+    await Bot.findByIdAndUpdate(botId, {
+      $inc: {
+        'stats.messageCount': 2, // User message + bot response
+        'stats.conversationCount': conversationId ? 0 : 1 // Increment only for new conversations
+      }
+    });
+    
+    return {
+      message: aiResponse,
+      conversationId: conversation._id
+    };
+  } catch (error) {
+    console.error('AI service error:', error);
+    throw error;
+  }
+};
