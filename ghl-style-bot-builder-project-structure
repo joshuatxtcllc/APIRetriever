@@ -1,0 +1,173 @@
+# GHL-Style Bot Builder - Project Structure
+
+```
+/bot-builder-project
+│
+├── /frontend
+│   ├── /public
+│   │   ├── favicon.ico
+│   │   ├── index.html
+│   │   └── robots.txt
+│   │
+│   ├── /src
+│   │   ├── /assets
+│   │   │   └── /images
+│   │   │       ├── logo.svg
+│   │   │       └── bot-avatar.png
+│   │   │
+│   │   ├── /components
+│   │   │   ├── /layout
+│   │   │   │   ├── Sidebar.jsx
+│   │   │   │   ├── Header.jsx
+│   │   │   │   ├── MainContent.jsx
+│   │   │   │   └── Layout.jsx
+│   │   │   │
+│   │   │   ├── /builder
+│   │   │   │   ├── BotList.jsx
+│   │   │   │   ├── BotCard.jsx
+│   │   │   │   ├── NewBotButton.jsx
+│   │   │   │   ├── GeneralSettings.jsx
+│   │   │   │   ├── ObjectivesEditor.jsx
+│   │   │   │   ├── ObjectiveItem.jsx
+│   │   │   │   ├── KnowledgeBase.jsx
+│   │   │   │   ├── KnowledgeItem.jsx
+│   │   │   │   ├── IntegrationsPanel.jsx
+│   │   │   │   ├── CalendarIntegration.jsx
+│   │   │   │   ├── CrmIntegration.jsx
+│   │   │   │   ├── WebsiteIntegration.jsx
+│   │   │   │   ├── AnalyticsDashboard.jsx
+│   │   │   │   └── BotDesigner.jsx
+│   │   │   │
+│   │   │   ├── /common
+│   │   │   │   ├── Button.jsx
+│   │   │   │   ├── Card.jsx
+│   │   │   │   ├── FormField.jsx
+│   │   │   │   ├── Select.jsx
+│   │   │   │   ├── Tabs.jsx
+│   │   │   │   ├── Switch.jsx
+│   │   │   │   ├── Modal.jsx
+│   │   │   │   └── Loader.jsx
+│   │   │   │
+│   │   │   └── /preview
+│   │   │       ├── ChatPreview.jsx
+│   │   │       ├── ChatMessage.jsx
+│   │   │       ├── ChatInput.jsx
+│   │   │       └── PreviewControls.jsx
+│   │   │
+│   │   ├── /hooks
+│   │   │   ├── useLocalStorage.js
+│   │   │   ├── useBotConfig.js
+│   │   │   ├── useObjectives.js
+│   │   │   └── useKnowledgeBase.js
+│   │   │
+│   │   ├── /pages
+│   │   │   ├── Dashboard.jsx
+│   │   │   ├── BotBuilder.jsx
+│   │   │   ├── Analytics.jsx
+│   │   │   ├── Settings.jsx
+│   │   │   └── Integrations.jsx
+│   │   │
+│   │   ├── /services
+│   │   │   ├── api.js
+│   │   │   ├── botService.js
+│   │   │   ├── aiService.js
+│   │   │   └── storageService.js
+│   │   │
+│   │   ├── /contexts
+│   │   │   ├── AuthContext.jsx
+│   │   │   └── BotContext.jsx
+│   │   │
+│   │   ├── /utils
+│   │   │   ├── validations.js
+│   │   │   ├── formatters.js
+│   │   │   └── helpers.js
+│   │   │
+│   │   ├── /styles
+│   │   │   ├── global.css
+│   │   │   └── variables.css
+│   │   │
+│   │   ├── App.jsx
+│   │   ├── index.jsx
+│   │   └── routes.jsx
+│   │
+│   ├── package.json
+│   ├── README.md
+│   └── .env
+│
+├── /backend
+│   ├── /src
+│   │   ├── /config
+│   │   │   ├── database.js
+│   │   │   ├── auth.js
+│   │   │   └── environment.js
+│   │   │
+│   │   ├── /controllers
+│   │   │   ├── authController.js
+│   │   │   ├── botController.js
+│   │   │   ├── userController.js
+│   │   │   ├── analyticsController.js
+│   │   │   ├── conversationController.js
+│   │   │   └── integrationController.js
+│   │   │
+│   │   ├── /models
+│   │   │   ├── User.js
+│   │   │   ├── Bot.js
+│   │   │   ├── Conversation.js
+│   │   │   ├── Message.js
+│   │   │   ├── Integration.js
+│   │   │   ├── ObjectiveCompletion.js
+│   │   │   └── Lead.js
+│   │   │
+│   │   ├── /routes
+│   │   │   ├── authRoutes.js
+│   │   │   ├── botRoutes.js
+│   │   │   ├── userRoutes.js
+│   │   │   ├── analyticsRoutes.js
+│   │   │   ├── conversationRoutes.js
+│   │   │   └── integrationRoutes.js
+│   │   │
+│   │   ├── /services
+│   │   │   ├── aiService.js
+│   │   │   ├── calendarService.js
+│   │   │   ├── crmService.js
+│   │   │   ├── emailService.js
+│   │   │   └── analyticsService.js
+│   │   │
+│   │   ├── /middleware
+│   │   │   ├── auth.js
+│   │   │   ├── errorHandler.js
+│   │   │   └── rateLimiter.js
+│   │   │
+│   │   ├── /utils
+│   │   │   ├── logger.js
+│   │   │   ├── validators.js
+│   │   │   └── helpers.js
+│   │   │
+│   │   └── server.js
+│   │
+│   ├── package.json
+│   ├── README.md
+│   └── .env
+│
+├── /chat-widget
+│   ├── /src
+│   │   ├── chat.js
+│   │   ├── styles.css
+│   │   └── index.js
+│   │
+│   ├── package.json
+│   └── README.md
+│
+├── .gitignore
+├── README.md
+└── package.json
+```
+
+## Key Components Overview
+
+### Frontend Components
+
+1. **Layout Components**: Handle the application's visual structure
+2. **Builder Components**: The core UI for creating and managing bots
+3. **Common Components**: Reusable UI elements
+4. **Preview Components**: Real-time chat simulation for
