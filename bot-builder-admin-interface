@@ -1,0 +1,467 @@
+import React, { useState } from 'react';
+import { Tabs, Tab, Card, CardContent, Button, TextField, Typography, Box, Switch, FormControlLabel, IconButton, Divider } from '@/components/ui';
+import { Plus, Trash2, BookOpen, MessageSquare, Calendar, Activity, Settings, Save, ArrowRight } from 'lucide-react';
+
+const BotBuilderInterface = () => {
+  const [activeTab, setActiveTab] = useState('general');
+  const [botConfig, setBotConfig] = useState({
+    botName: 'Sales Assistant',
+    businessName: 'Your Business',
+    businessDescription: 'We help businesses grow with innovative solutions',
+    welcomeMessage: 'Hi there! How can I help you today?',
+    objectives: [
+      {
+        id: '1',
+        name: 'Qualify Lead',
+        priority: 1,
+        questions: ['What's your budget range?', 'What timeline are you working with?']
+      },
+      {
+        id: '2',
+        name: 'Book Appointment',
+        priority: 2,
+        questions: ['Would you like to schedule a call with our team?']
+      }
+    ],
+    knowledgeBase: [
+      { question: 'What services do you offer?', answer: 'We offer web development, marketing, and consulting services.' },
+      { question: 'How much do your services cost?', answer: 'Our services start at $1000. We can provide a custom quote based on your needs.' }
+    ],
+    aiSettings: {
+      model: 'gpt-4',
+      temperature: 0.7,
+      enableSmartResponses: true
+    }
+  });
+
+  const handleInputChange = (section, field, value) => {
+    setBotConfig({
+      ...botConfig,
+      [section]: {
+        ...botConfig[section],
+        [field]: value
+      }
+    });
+  };
+
+  const handleGeneralChange = (field, value) => {
+    setBotConfig({
+      ...botConfig,
+      [field]: value
+    });
+  };
+
+  const addObjective = () => {
+    const newObjectives = [...botConfig.objectives];
+    newObjectives.push({
+      id: Date.now().toString(),
+      name: 'New Objective',
+      priority: newObjectives.length + 1,
+      questions: ['']
+    });
+    setBotConfig({
+      ...botConfig,
+      objectives: newObjectives
+    });
+  };
+
+  const addQuestion = (objectiveId) => {
+    const newObjectives = botConfig.objectives.map(obj => {
+      if (obj.id === objectiveId) {
+        return {
+          ...obj,
+          questions: [...obj.questions, '']
+        };
+      }
+      return obj;
+    });
+    setBotConfig({
+      ...botConfig,
+      objectives: newObjectives
+    });
+  };
+
+  const updateObjective = (id, field, value) => {
+    const newObjectives = botConfig.objectives.map(obj => {
+      if (obj.id === id) {
+        return {
+          ...obj,
+          [field]: value
+        };
+      }
+      return obj;
+    });
+    setBotConfig({
+      ...botConfig,
+      objectives: newObjectives
+    });
+  };
+
+  const updateQuestion = (objectiveId, index, value) => {
+    const newObjectives = botConfig.objectives.map(obj => {
+      if (obj.id === objectiveId) {
+        const newQuestions = [...obj.questions];
+        newQuestions[index] = value;
+        return {
+          ...obj,
+          questions: newQuestions
+        };
+      }
+      return obj;
+    });
+    setBotConfig({
+      ...botConfig,
+      objectives: newObjectives
+    });
+  };
+
+  const addKnowledgeItem = () => {
+    setBotConfig({
+      ...botConfig,
+      knowledgeBase: [...botConfig.knowledgeBase, { question: '', answer: '' }]
+    });
+  };
+
+  const updateKnowledgeItem = (index, field, value) => {
+    const newKnowledgeBase = [...botConfig.knowledgeBase];
+    newKnowledgeBase[index] = {
+      ...newKnowledgeBase[index],
+      [field]: value
+    };
+    setBotConfig({
+      ...botConfig,
+      knowledgeBase: newKnowledgeBase
+    });
+  };
+
+  const saveBotConfig = () => {
+    console.log('Saving bot configuration:', botConfig);
+    // Here you would send the configuration to your backend
+    alert('Bot configuration saved!');
+  };
+
+  return (
+    <div className="w-full max-w-6xl mx-auto p-4">
+      <Box className="mb-4 flex justify-between items-center">
+        <Typography variant="h4" className="font-bold">Bot Builder</Typography>
+        <Button 
+          variant="contained" 
+          color="primary" 
+          onClick={saveBotConfig}
+          startIcon={<Save size={16} />}
+        >
+          Save Configuration
+        </Button>
+      </Box>
+
+      <Card className="mb-4">
+        <CardContent>
+          <Tabs value={activeTab} onChange={(e, val) => setActiveTab(val)}>
+            <Tab icon={<Settings size={16} />} label="General" value="general" />
+            <Tab icon={<MessageSquare size={16} />} label="Objectives" value="objectives" />
+            <Tab icon={<BookOpen size={16} />} label="Knowledge Base" value="knowledge" />
+            <Tab icon={<Calendar size={16} />} label="Integrations" value="integrations" />
+            <Tab icon={<Activity size={16} />} label="Analytics" value="analytics" />
+          </Tabs>
+        </CardContent>
+      </Card>
+
+      {activeTab === 'general' && (
+        <Card>
+          <CardContent>
+            <Typography variant="h6" className="mb-4">General Settings</Typography>
+            
+            <div className="space-y-4">
+              <TextField
+                fullWidth
+                label="Bot Name"
+                value={botConfig.botName}
+                onChange={(e) => handleGeneralChange('botName', e.target.value)}
+              />
+              
+              <TextField
+                fullWidth
+                label="Business Name"
+                value={botConfig.businessName}
+                onChange={(e) => handleGeneralChange('businessName', e.target.value)}
+              />
+              
+              <TextField
+                fullWidth
+                multiline
+                rows={3}
+                label="Business Description"
+                value={botConfig.businessDescription}
+                onChange={(e) => handleGeneralChange('businessDescription', e.target.value)}
+              />
+              
+              <TextField
+                fullWidth
+                label="Welcome Message"
+                value={botConfig.welcomeMessage}
+                onChange={(e) => handleGeneralChange('welcomeMessage', e.target.value)}
+              />
+
+              <Divider className="my-4" />
+              
+              <Typography variant="h6" className="mb-2">AI Settings</Typography>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <TextField
+                  label="AI Model"
+                  select
+                  value={botConfig.aiSettings.model}
+                  onChange={(e) => handleInputChange('aiSettings', 'model', e.target.value)}
+                  SelectProps={{
+                    native: true,
+                  }}
+                >
+                  <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                  <option value="gpt-4">GPT-4</option>
+                  <option value="claude-3-opus">Claude 3 Opus</option>
+                </TextField>
+                
+                <TextField
+                  label="Temperature"
+                  type="number"
+                  inputProps={{ min: 0, max: 1, step: 0.1 }}
+                  value={botConfig.aiSettings.temperature}
+                  onChange={(e) => handleInputChange('aiSettings', 'temperature', parseFloat(e.target.value))}
+                />
+              </div>
+              
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={botConfig.aiSettings.enableSmartResponses}
+                    onChange={(e) => handleInputChange('aiSettings', 'enableSmartResponses', e.target.checked)}
+                  />
+                }
+                label="Enable Smart Responses"
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {activeTab === 'objectives' && (
+        <Card>
+          <CardContent>
+            <div className="flex justify-between items-center mb-4">
+              <Typography variant="h6">Conversation Objectives</Typography>
+              <Button
+                variant="outlined"
+                startIcon={<Plus size={16} />}
+                onClick={addObjective}
+              >
+                Add Objective
+              </Button>
+            </div>
+            
+            <div className="space-y-6">
+              {botConfig.objectives.map((objective, idx) => (
+                <div key={objective.id} className="p-4 border rounded-lg">
+                  <div className="flex justify-between items-center mb-2">
+                    <Typography variant="subtitle1" className="font-bold">
+                      {idx + 1}. {objective.name}
+                    </Typography>
+                    <IconButton color="error" onClick={() => {
+                      const newObjectives = botConfig.objectives.filter(o => o.id !== objective.id);
+                      setBotConfig({...botConfig, objectives: newObjectives});
+                    }}>
+                      <Trash2 size={16} />
+                    </IconButton>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <TextField
+                      label="Objective Name"
+                      value={objective.name}
+                      onChange={(e) => updateObjective(objective.id, 'name', e.target.value)}
+                    />
+                    
+                    <TextField
+                      label="Priority"
+                      type="number"
+                      inputProps={{ min: 1 }}
+                      value={objective.priority}
+                      onChange={(e) => updateObjective(objective.id, 'priority', parseInt(e.target.value))}
+                    />
+                  </div>
+                  
+                  <Typography variant="subtitle2" className="mb-2">Questions</Typography>
+                  {objective.questions.map((question, qIdx) => (
+                    <div key={qIdx} className="flex items-center mb-2">
+                      <TextField
+                        fullWidth
+                        value={question}
+                        onChange={(e) => updateQuestion(objective.id, qIdx, e.target.value)}
+                        placeholder={`Question ${qIdx + 1}`}
+                      />
+                      <IconButton color="error" className="ml-2" onClick={() => {
+                        const newObjectives = botConfig.objectives.map(obj => {
+                          if (obj.id === objective.id) {
+                            return {
+                              ...obj,
+                              questions: obj.questions.filter((_, i) => i !== qIdx)
+                            };
+                          }
+                          return obj;
+                        });
+                        setBotConfig({...botConfig, objectives: newObjectives});
+                      }}>
+                        <Trash2 size={14} />
+                      </IconButton>
+                    </div>
+                  ))}
+                  
+                  <Button
+                    variant="text"
+                    startIcon={<Plus size={14} />}
+                    onClick={() => addQuestion(objective.id)}
+                    size="small"
+                  >
+                    Add Question
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {activeTab === 'knowledge' && (
+        <Card>
+          <CardContent>
+            <div className="flex justify-between items-center mb-4">
+              <Typography variant="h6">Knowledge Base</Typography>
+              <Button
+                variant="outlined"
+                startIcon={<Plus size={16} />}
+                onClick={addKnowledgeItem}
+              >
+                Add FAQ
+              </Button>
+            </div>
+            
+            <div className="space-y-6">
+              {botConfig.knowledgeBase.map((item, idx) => (
+                <div key={idx} className="p-4 border rounded-lg">
+                  <div className="flex justify-between items-center mb-2">
+                    <Typography variant="subtitle1" className="font-bold">FAQ #{idx + 1}</Typography>
+                    <IconButton color="error" onClick={() => {
+                      const newKnowledgeBase = botConfig.knowledgeBase.filter((_, i) => i !== idx);
+                      setBotConfig({...botConfig, knowledgeBase: newKnowledgeBase});
+                    }}>
+                      <Trash2 size={16} />
+                    </IconButton>
+                  </div>
+                  
+                  <TextField
+                    fullWidth
+                    label="Question"
+                    value={item.question}
+                    onChange={(e) => updateKnowledgeItem(idx, 'question', e.target.value)}
+                    className="mb-3"
+                  />
+                  
+                  <TextField
+                    fullWidth
+                    multiline
+                    rows={4}
+                    label="Answer"
+                    value={item.answer}
+                    onChange={(e) => updateKnowledgeItem(idx, 'answer', e.target.value)}
+                  />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {activeTab === 'integrations' && (
+        <Card>
+          <CardContent>
+            <Typography variant="h6" className="mb-4">Integrations</Typography>
+            
+            <div className="space-y-6">
+              <div className="p-4 border rounded-lg">
+                <Typography variant="subtitle1" className="font-bold mb-2">Calendar Integration</Typography>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <TextField
+                    select
+                    label="Calendar Provider"
+                    defaultValue="google"
+                    SelectProps={{ native: true }}
+                  >
+                    <option value="google">Google Calendar</option>
+                    <option value="outlook">Outlook Calendar</option>
+                    <option value="calendly">Calendly</option>
+                  </TextField>
+                  <TextField label="API Key" type="password" />
+                </div>
+                <Button variant="contained" className="mt-4" startIcon={<ArrowRight size={16} />}>
+                  Connect
+                </Button>
+              </div>
+              
+              <div className="p-4 border rounded-lg">
+                <Typography variant="subtitle1" className="font-bold mb-2">CRM Integration</Typography>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <TextField
+                    select
+                    label="CRM Provider"
+                    defaultValue="none"
+                    SelectProps={{ native: true }}
+                  >
+                    <option value="none">Select CRM</option>
+                    <option value="salesforce">Salesforce</option>
+                    <option value="hubspot">HubSpot</option>
+                    <option value="zoho">Zoho CRM</option>
+                  </TextField>
+                  <TextField label="API Key" type="password" />
+                </div>
+                <Button variant="contained" className="mt-4" startIcon={<ArrowRight size={16} />}>
+                  Connect
+                </Button>
+              </div>
+              
+              <div className="p-4 border rounded-lg">
+                <Typography variant="subtitle1" className="font-bold mb-2">Website Integration</Typography>
+                <Typography variant="body2" className="mb-4">
+                  Copy this code snippet and paste it into your website to embed the chatbot.
+                </Typography>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={3}
+                  value={`<script src="https://your-bot-domain.com/bot.js?id=YOUR_BOT_ID"></script>`}
+                  InputProps={{
+                    readOnly: true,
+                  }}
+                />
+                <Button variant="outlined" className="mt-2">
+                  Copy Code
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {activeTab === 'analytics' && (
+        <Card>
+          <CardContent>
+            <Typography variant="h6" className="mb-4">Analytics Dashboard</Typography>
+            <Typography variant="body1" className="text-center py-8 text-gray-500">
+              Analytics dashboard will appear here once your bot starts collecting data.
+            </Typography>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+};
+
+export default BotBuilderInterface;
