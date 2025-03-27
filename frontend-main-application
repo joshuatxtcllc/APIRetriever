@@ -1,0 +1,607 @@
+// File: /frontend/src/App.jsx
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { BotProvider } from './contexts/BotContext';
+import Dashboard from './pages/Dashboard';
+import BotBuilder from './pages/BotBuilder';
+import Analytics from './pages/Analytics';
+import Settings from './pages/Settings';
+import Integrations from './pages/Integrations';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import NotFound from './pages/NotFound';
+import Layout from './components/layout/Layout';
+import './styles/global.css';
+
+// Protected route component
+const ProtectedRoute = ({ children }) => {
+  const { isAuthenticated, loading } = useAuth();
+  
+  if (loading) {
+    return <div className="loading-screen">Loading...</div>;
+  }
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/login" />;
+  }
+  
+  return children;
+};
+
+const App = () => {
+  return (
+    <Router>
+      <AuthProvider>
+        <BotProvider>
+          <Routes>
+            {/* Public routes */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            
+            {/* Protected routes */}
+            <Route 
+              path="/" 
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Dashboard />
+                  </Layout>
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/bot-builder" 
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <BotBuilder />
+                  </Layout>
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/bot-builder/:id" 
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <BotBuilder />
+                  </Layout>
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/analytics" 
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Analytics />
+                  </Layout>
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/analytics/:botId" 
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Analytics />
+                  </Layout>
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/settings" 
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Settings />
+                  </Layout>
+                </ProtectedRoute>
+              } 
+            />
+            
+            <Route 
+              path="/integrations" 
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Integrations />
+                  </Layout>
+                </ProtectedRoute>
+              } 
+            />
+            
+            {/* 404 route */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BotProvider>
+      </AuthProvider>
+    </Router>
+  );
+};
+
+export default App;
+
+// File: /frontend/src/pages/BotBuilder.jsx
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useBotContext } from '../contexts/BotContext';
+import Tabs from '../components/common/Tabs';
+import Button from '../components/common/Button';
+import Loader from '../components/common/Loader';
+import GeneralSettings from '../components/builder/GeneralSettings';
+import ObjectivesEditor from '../components/builder/ObjectivesEditor';
+import KnowledgeBase from '../components/builder/KnowledgeBase';
+import BotDesigner from '../components/builder/BotDesigner';
+import IntegrationsPanel from '../components/builder/IntegrationsPanel';
+import ChatPreview from '../components/preview/ChatPreview';
+import { Save, ArrowLeft, Play, Code } from 'lucide-react';
+import Modal from '../components/common/Modal';
+
+const BotBuilder = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { getBotById, createBot, updateBot } = useBotContext();
+  
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState('general');
+  const [showPreview, setShowPreview] = useState(false);
+  const [showCodeModal, setShowCodeModal] = useState(false);
+  const [botConfig, setBotConfig] = useState(null);
+  const [error, setError] = useState(null);
+  
+  // Load bot config if editing an existing bot
+  useEffect(() => {
+    const loadBot = async () => {
+      if (id) {
+        try {
+          setLoading(true);
+          const bot = await getBotById(id);
+          setBotConfig(bot);
+          setLoading(false);
+        } catch (err) {
+          setError('Failed to load bot. Please try again.');
+          setLoading(false);
+        }
+      } else {
+        // Creating a new bot, use default config
+        setBotConfig({
+          name: 'New Bot',
+          description: '',
+          status: 'draft',
+          welcomeMessage: 'Hi there! How can I help you today?',
+          businessInfo: {
+            name: '',
+            description: '',
+            website: '',
+            phone: '',
+            email: ''
+          },
+          objectives: [
+            {
+              id: 'obj-1',
+              name: 'Qualify Lead',
+              priority: 1,
+              questions: ['What's your budget range?', 'What timeline are you working with?']
+            },
+            {
+              id: 'obj-2',
+              name: 'Book Appointment',
+              priority: 2,
+              questions: ['Would you like to schedule a call with our team?']
+            }
+          ],
+          knowledgeBase: [
+            {
+              id: 'kb-1',
+              question: 'What services do you offer?',
+              answer: 'We offer web development, marketing, and consulting services.'
+            }
+          ],
+          aiSettings: {
+            model: 'gpt-3.5-turbo',
+            temperature: 0.7,
+            enableSmartResponses: true
+          },
+          design: {
+            primaryColor: '#1976D2',
+            secondaryColor: '#FFFFFF',
+            fontFamily: 'Inter, sans-serif',
+            borderRadius: 8,
+            position: 'bottom-right'
+          },
+          integrations: {
+            calendar: {
+              type: 'none',
+              configured: false
+            },
+            crm: {
+              type: 'none',
+              configured: false
+            }
+          }
+        });
+        setLoading(false);
+      }
+    };
+    
+    loadBot();
+  }, [id, getBotById]);
+  
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      
+      if (id) {
+        // Update existing bot
+        await updateBot(id, botConfig);
+      } else {
+        // Create new bot
+        const newBot = await createBot(botConfig);
+        navigate(`/bot-builder/${newBot._id}`);
+      }
+      
+      setSaving(false);
+    } catch (err) {
+      setError('Failed to save bot. Please try again.');
+      setSaving(false);
+    }
+  };
+  
+  const updateBotConfig = (updatedConfig) => {
+    setBotConfig(updatedConfig);
+  };
+  
+  // Generate embed code for the widget
+  const getEmbedCode = () => {
+    if (!id) return '';
+    
+    return `<script src="https://cdn.your-bot-builder.com/widget.js" data-bot-id="${id}" data-api-url="https://api.your-bot-builder.com"></script>`;
+  };
+  
+  if (loading) {
+    return <Loader />;
+  }
+  
+  if (error) {
+    return (
+      <div className="error-container">
+        <p>{error}</p>
+        <Button onClick={() => window.location.reload()}>Retry</Button>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="bot-builder-container">
+      {/* Header with tabs */}
+      <div className="bot-builder-header">
+        <div className="header-left">
+          <Button 
+            className="back-button"
+            onClick={() => navigate('/')}
+            icon={<ArrowLeft size={16} />}
+          >
+            Back to Dashboard
+          </Button>
+          <h1>{id ? `Edit ${botConfig.name}` : 'Create New Bot'}</h1>
+        </div>
+        
+        <div className="header-actions">
+          <Button 
+            className="preview-button"
+            onClick={() => setShowPreview(prev => !prev)}
+            icon={<Play size={16} />}
+          >
+            Preview
+          </Button>
+          
+          {id && (
+            <Button 
+              className="embed-button"
+              onClick={() => setShowCodeModal(true)}
+              icon={<Code size={16} />}
+            >
+              Get Code
+            </Button>
+          )}
+          
+          <Button 
+            className="save-button"
+            primary
+            onClick={handleSave}
+            loading={saving}
+            icon={<Save size={16} />}
+          >
+            {saving ? 'Saving...' : 'Save Bot'}
+          </Button>
+        </div>
+      </div>
+      
+      <div className="bot-builder-content">
+        <div className={`builder-main ${showPreview ? 'with-preview' : ''}`}>
+          {/* Tabs navigation */}
+          <Tabs 
+            activeTab={activeTab}
+            onChange={setActiveTab}
+            tabs={[
+              { id: 'general', label: 'General' },
+              { id: 'objectives', label: 'Objectives' },
+              { id: 'knowledge', label: 'Knowledge Base' },
+              { id: 'design', label: 'Design' },
+              { id: 'integrations', label: 'Integrations' }
+            ]}
+          />
+          
+          {/* Tab content */}
+          <div className="tab-content">
+            {activeTab === 'general' && (
+              <GeneralSettings 
+                botConfig={botConfig} 
+                updateBotConfig={updateBotConfig} 
+              />
+            )}
+            
+            {activeTab === 'objectives' && (
+              <ObjectivesEditor 
+                objectives={botConfig.objectives} 
+                updateObjectives={(objectives) => updateBotConfig({
+                  ...botConfig,
+                  objectives
+                })} 
+              />
+            )}
+            
+            {activeTab === 'knowledge' && (
+              <KnowledgeBase 
+                knowledgeBase={botConfig.knowledgeBase} 
+                updateKnowledgeBase={(knowledgeBase) => updateBotConfig({
+                  ...botConfig,
+                  knowledgeBase
+                })} 
+              />
+            )}
+            
+            {activeTab === 'design' && (
+              <BotDesigner 
+                design={botConfig.design} 
+                updateDesign={(design) => updateBotConfig({
+                  ...botConfig,
+                  design
+                })} 
+              />
+            )}
+            
+            {activeTab === 'integrations' && (
+              <IntegrationsPanel 
+                integrations={botConfig.integrations} 
+                updateIntegrations={(integrations) => updateBotConfig({
+                  ...botConfig,
+                  integrations
+                })} 
+              />
+            )}
+          </div>
+        </div>
+        
+        {/* Chat preview */}
+        {showPreview && (
+          <div className="chat-preview-panel">
+            <ChatPreview 
+              botConfig={botConfig} 
+              onClose={() => setShowPreview(false)} 
+            />
+          </div>
+        )}
+      </div>
+      
+      {/* Embed code modal */}
+      <Modal
+        isOpen={showCodeModal}
+        onClose={() => setShowCodeModal(false)}
+        title="Embed Your Bot"
+      >
+        <div className="embed-code-container">
+          <p>Add this code to your website to embed your bot:</p>
+          
+          <div className="code-snippet">
+            <pre>{getEmbedCode()}</pre>
+            <Button 
+              onClick={() => {
+                navigator.clipboard.writeText(getEmbedCode());
+                alert('Code copied to clipboard!');
+              }}
+            >
+              Copy Code
+            </Button>
+          </div>
+          
+          <div className="embed-instructions">
+            <h4>Installation Instructions:</h4>
+            <ol>
+              <li>Copy the code snippet above.</li>
+              <li>Paste it just before the closing <code>&lt;/body&gt;</code> tag of your website.</li>
+              <li>Save your webpage and refresh to see the bot in action.</li>
+            </ol>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+};
+
+export default BotBuilder;
+
+// File: /frontend/src/pages/Dashboard.jsx
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { useBotContext } from '../contexts/BotContext';
+import BotList from '../components/builder/BotList';
+import Loader from '../components/common/Loader';
+import { BarChart2, MessageSquare, Calendar, UserPlus } from 'lucide-react';
+
+const Dashboard = () => {
+  const { getAllBots, getAnalyticsOverview } = useBotContext();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [bots, setBots] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
+  
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch bots and analytics in parallel
+        const [botsData, analyticsData] = await Promise.all([
+          getAllBots(),
+          getAnalyticsOverview()
+        ]);
+        
+        setBots(botsData);
+        setAnalytics(analyticsData);
+        setLoading(false);
+      } catch (err) {
+        setError('Failed to load dashboard data. Please try again.');
+        setLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, [getAllBots, getAnalyticsOverview]);
+  
+  if (loading) {
+    return <Loader />;
+  }
+  
+  if (error) {
+    return (
+      <div className="error-container">
+        <p>{error}</p>
+        <button onClick={() => window.location.reload()}>Retry</button>
+      </div>
+    );
+  }
+  
+  // If no bots, show onboarding screen
+  if (bots.length === 0) {
+    return (
+      <div className="onboarding-container">
+        <h1>Welcome to Bot Builder!</h1>
+        <p>Get started by creating your first bot</p>
+        
+        <Link to="/bot-builder" className="create-first-bot-btn">
+          Create Your First Bot
+        </Link>
+        
+        <div className="features-grid">
+          <div className="feature-card">
+            <div className="feature-icon">
+              <MessageSquare size={24} />
+            </div>
+            <h3>AI-Powered Chat</h3>
+            <p>Create chatbots that understand natural language and respond intelligently</p>
+          </div>
+          
+          <div className="feature-card">
+            <div className="feature-icon">
+              <Calendar size={24} />
+            </div>
+            <h3>Appointment Booking</h3>
+            <p>Let your bot schedule appointments directly on your calendar</p>
+          </div>
+          
+          <div className="feature-card">
+            <div className="feature-icon">
+              <UserPlus size={24} />
+            </div>
+            <h3>Lead Generation</h3>
+            <p>Qualify leads and collect contact information automatically</p>
+          </div>
+          
+          <div className="feature-card">
+            <div className="feature-icon">
+              <BarChart2 size={24} />
+            </div>
+            <h3>Analytics</h3>
+            <p>Track performance and optimize your bot with detailed insights</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // Dashboard with bots and analytics
+  return (
+    <div className="dashboard-container">
+      <div className="dashboard-header">
+        <h1>Dashboard</h1>
+        <Link to="/bot-builder" className="create-bot-btn">
+          Create New Bot
+        </Link>
+      </div>
+      
+      {/* Analytics overview */}
+      {analytics && (
+        <div className="analytics-overview">
+          <div className="stats-card">
+            <div className="stats-icon conversation-icon">
+              <MessageSquare size={20} />
+            </div>
+            <div className="stats-content">
+              <h3>Total Conversations</h3>
+              <p className="stats-value">{analytics.totalStats.totalConversations.toLocaleString()}</p>
+            </div>
+          </div>
+          
+          <div className="stats-card">
+            <div className="stats-icon message-icon">
+              <MessageSquare size={20} />
+            </div>
+            <div className="stats-content">
+              <h3>Total Messages</h3>
+              <p className="stats-value">{analytics.totalStats.totalMessages.toLocaleString()}</p>
+            </div>
+          </div>
+          
+          <div className="stats-card">
+            <div className="stats-icon appointment-icon">
+              <Calendar size={20} />
+            </div>
+            <div className="stats-content">
+              <h3>Appointments Booked</h3>
+              <p className="stats-value">{analytics.totalStats.totalAppointments.toLocaleString()}</p>
+            </div>
+          </div>
+          
+          <div className="stats-card">
+            <div className="stats-icon lead-icon">
+              <UserPlus size={20} />
+            </div>
+            <div className="stats-content">
+              <h3>Leads Generated</h3>
+              <p className="stats-value">{analytics.totalStats.totalLeads.toLocaleString()}</p>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Bot list */}
+      <div className="bots-section">
+        <h2>Your Bots</h2>
+        <BotList bots={bots} />
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;
